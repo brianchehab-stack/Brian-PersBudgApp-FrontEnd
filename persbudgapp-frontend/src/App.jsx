@@ -526,9 +526,24 @@ function App() {
     setAuthStatusMessage(authMode === 'login' ? 'Signing in...' : 'Creating your account...')
 
     try {
-      const authPayload = authMode === 'login'
-        ? await loginUser({ email, password })
-        : await registerUser({ name, email, password })
+      let authPayload
+
+      if (authMode === 'login') {
+        authPayload = await loginUser({ email, password })
+      } else {
+        const registrationPayload = await registerUser({ name, email, password })
+
+        if (registrationPayload.token) {
+          authPayload = registrationPayload
+        } else {
+          setAuthStatusMessage('Account created. Signing you in...')
+          const loginPayload = await loginUser({ email, password })
+          authPayload = {
+            token: loginPayload.token,
+            user: registrationPayload.user ?? loginPayload.user,
+          }
+        }
+      }
 
       setAuthToken(authPayload.token)
       setAuthUser(authPayload.user)

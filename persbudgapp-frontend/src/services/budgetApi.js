@@ -1,4 +1,6 @@
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? ''
+const configuredBaseUrl =
+  import.meta.env.VITE_API_BASE_URL?.trim() || import.meta.env.VITE_API_URL?.trim() || ''
+const apiBaseUrl = configuredBaseUrl.replace(/\/+$/, '')
 
 export const isBackendConfigured = apiBaseUrl.length > 0
 let authToken = ''
@@ -42,19 +44,29 @@ async function requestJson(path, options = {}) {
   return response.json()
 }
 
-function parseAuthPayload(payload) {
+function parseAuthPayload(payload, options = {}) {
+  const { requireToken = true } = options
+
   if (!payload || typeof payload !== 'object') {
     throw new Error('Invalid authentication response from backend.')
   }
 
-  const token = payload.token || payload.accessToken || payload.jwt
-  if (typeof token !== 'string' || token.length === 0) {
+  const tokenCandidate =
+    payload.token ||
+    payload.accessToken ||
+    payload.jwt ||
+    payload?.data?.token ||
+    payload?.data?.accessToken ||
+    payload?.data?.jwt
+  const token = typeof tokenCandidate === 'string' ? tokenCandidate : ''
+
+  if (requireToken && token.length === 0) {
     throw new Error('Backend did not return a JWT token.')
   }
 
   return {
     token,
-    user: payload.user ?? null,
+    user: payload.user ?? payload?.data?.user ?? null,
   }
 }
 
@@ -73,7 +85,7 @@ export async function registerUser(account) {
     body: JSON.stringify(account),
   })
 
-  return parseAuthPayload(payload)
+  return parseAuthPayload(payload, { requireToken: false })
 }
 
 export function fetchTransactions() {
