@@ -4,7 +4,7 @@
 
 The Personal Budget Application helps users track their income, expenses, and savings in one place. It exists to give individuals better visibility into their spending habits and help them make informed financial decisions through budgeting and expense tracking. 
 
-2. Features 
+2. Features a
 
 Users will be able to: 
 

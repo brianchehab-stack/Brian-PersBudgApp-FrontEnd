@@ -1,16 +1,27 @@
-# React + Vite
+# Personal Budget App Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This frontend is ready to talk to a server-side API for transactions and budgets.
 
-Currently, two official plugins are available:
+## Backend Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Set `VITE_API_BASE_URL` before running the app. Use the base API path, for example:
 
-## React Compiler
+```bash
+VITE_API_BASE_URL=http://localhost:3000/api
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The frontend expects these endpoints:
 
-## Expanding the ESLint configuration
+- `POST /auth/login`
+- `POST /auth/register`
+- `GET /transactions`
+- `POST /transactions`
+- `PUT /transactions/:id`
+- `DELETE /transactions/:id`
+- `GET /budgets`
+- `POST /budgets`
+- `PUT /budgets/:id`
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Authentication responses should include a token field (for example `token`, `accessToken`, or `jwt`) and may include a `user` object.
+
+If the backend cannot be reached, the app falls back to local demo data so the UI still works during development.
