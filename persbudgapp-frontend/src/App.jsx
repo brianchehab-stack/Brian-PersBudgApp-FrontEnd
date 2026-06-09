@@ -6,6 +6,7 @@ import {
   deleteTransaction,
   fetchBudgets,
   fetchTransactions,
+  apiConfigurationWarning,
   isBackendConfigured,
   loginUser,
   registerUser,
@@ -136,6 +137,7 @@ function App() {
     limit: '',
   })
   const [filters, setFilters] = useState({ category: 'All', startDate: '', endDate: '' })
+  const startupWarning = apiConfigurationWarning
 
   useEffect(() => {
     setApiAuthToken(authToken)
@@ -589,6 +591,12 @@ function App() {
   if (isAuthRoute) {
     return (
       <div className="app-shell auth-shell">
+        {startupWarning ? (
+          <p className="startup-banner" role="status">
+            {startupWarning}
+          </p>
+        ) : null}
+
         <section className="auth-panel">
           <div className="auth-hero">
             <p className="eyebrow">Welcome to PersBudgApp</p>
@@ -680,6 +688,12 @@ function App() {
 
   return (
     <div className="app-shell">
+      {startupWarning ? (
+        <p className="startup-banner" role="status">
+          {startupWarning}
+        </p>
+      ) : null}
+
       <header className="hero-panel">
         <div className="hero-copy">
           <p className="eyebrow">Personal budget dashboard</p>

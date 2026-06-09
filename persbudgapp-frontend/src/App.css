@@ -4,6 +4,15 @@
   padding: 32px;
 }
 
+.startup-banner {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  background: rgba(15, 23, 42, 0.84);
+  color: #fde68a;
+}
+
 .auth-shell {
   min-height: 100vh;
   display: grid;
