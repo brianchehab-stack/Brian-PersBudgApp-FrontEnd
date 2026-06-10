@@ -712,6 +712,11 @@ function App() {
             <button type="button" className="secondary-button" onClick={clearStoredData}>
               {isBackendConfigured ? 'Reload backend data' : 'Reset demo data'}
             </button>
+            {isBackendConfigured && authToken ? (
+              <button type="button" className="ghost-button" onClick={handleLogout}>
+                Log out
+              </button>
+            ) : null}
           </div>
         </div>
 
