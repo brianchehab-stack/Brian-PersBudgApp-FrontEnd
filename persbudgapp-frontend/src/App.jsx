@@ -696,8 +696,8 @@ function App() {
 
       <header className="hero-panel">
         <div className="hero-copy">
-          <p className="eyebrow">Personal budget dashboard</p>
-          <h1>Track income, spending, budgets, and savings in one place.</h1>
+          <p className="eyebrow">Personal Budget Dashboard</p>
+          <h1>Track your income, expenses, and savings</h1>
           <p className="hero-description">
             Add transactions, monitor category budgets, spot overspending early, and keep your financial
             history available in the browser for future visits.
