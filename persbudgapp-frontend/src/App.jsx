@@ -21,6 +21,7 @@ const budgetAlertThreshold = 0.8
 
 const expenseCategories = [
   'Food',
+  'Housing/Rent',
   'Transportation',
   'Entertainment',
   'Bills',
