@@ -6,7 +6,7 @@ function isLocalHostName(hostname) {
 }
 
 function parseCandidateBaseUrl(candidate, runningInBrowser) {
-  const trimmedCandidate = candidate.trim()
+  const trimmedCandidate = candidate.trim() 
   if (!trimmedCandidate) {
     return null
   }
