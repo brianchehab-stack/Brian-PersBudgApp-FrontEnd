@@ -96,7 +96,7 @@ function createSeedBudgets() {
 }
 
 function App() {
-  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' })
+  const [authForm, setAuthForm] = useState({ firstName: '', lastName: '', email: '', password: '' })
   const [authStatusMessage, setAuthStatusMessage] = useState('')
   const [authError, setAuthError] = useState('')
   const location = useLocation()
@@ -513,15 +513,17 @@ function App() {
 
     const email = authForm.email.trim()
     const password = authForm.password
-    const name = authForm.name.trim()
+    const firstName = authForm.firstName.trim()
+    const lastName = authForm.lastName.trim()
+    const fullName = [firstName, lastName].filter(Boolean).join(' ')
 
     if (!email || !password) {
       setAuthError('Email and password are required.')
       return
     }
 
-    if (authMode === 'register' && !name) {
-      setAuthError('Name is required for sign up.')
+    if (authMode === 'register' && (!firstName || !lastName)) {
+      setAuthError('First name and last name are required for sign up.')
       return
     }
 
@@ -534,7 +536,7 @@ function App() {
       if (authMode === 'login') {
         authPayload = await loginUser({ email, password })
       } else {
-        const registrationPayload = await registerUser({ name, email, password })
+        const registrationPayload = await registerUser({ name: fullName, email, password })
 
         if (registrationPayload.token) {
           authPayload = registrationPayload
@@ -635,17 +637,37 @@ function App() {
 
             <form className="stacked-form" onSubmit={handleAuthSubmit}>
               {authMode === 'register' ? (
-                <label>
-                  Full name
-                  <input
-                    type="text"
-                    value={authForm.name}
-                    onChange={(event) =>
-                      setAuthForm((currentForm) => ({ ...currentForm, name: event.target.value }))
-                    }
-                    placeholder="Jane Budget"
-                  />
-                </label>
+                <>
+                  <label>
+                    First name
+                    <input
+                      type="text"
+                      value={authForm.firstName}
+                      onChange={(event) =>
+                        setAuthForm((currentForm) => ({
+                          ...currentForm,
+                          firstName: event.target.value,
+                        }))
+                      }
+                      placeholder="Jane"
+                    />
+                  </label>
+
+                  <label>
+                    Last name
+                    <input
+                      type="text"
+                      value={authForm.lastName}
+                      onChange={(event) =>
+                        setAuthForm((currentForm) => ({
+                          ...currentForm,
+                          lastName: event.target.value,
+                        }))
+                      }
+                      placeholder="Budget"
+                    />
+                  </label>
+                </>
               ) : null}
 
               <label>
