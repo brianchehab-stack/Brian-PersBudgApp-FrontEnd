@@ -81,6 +81,108 @@ function getDisplayName(user) {
   return 'there'
 }
 
+function getSpeechRecognitionConstructor() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null
+}
+
+function normalizeVoiceDate(candidate) {
+  if (typeof candidate !== 'string') {
+    return ''
+  }
+
+  const parsedDate = new Date(candidate.trim())
+  if (Number.isNaN(parsedDate.getTime())) {
+    return ''
+  }
+
+  return parsedDate.toISOString().slice(0, 10)
+}
+
+function resolveVoiceTransactionCategory(transcript) {
+  const normalizedTranscript = transcript.toLowerCase()
+
+  const categoryAliases = [
+    { category: 'Other Income', aliases: ['other income', 'misc income'] },
+    { category: 'Housing/Rent', aliases: ['housing/rent', 'housing rent', 'house rent', 'housing', 'rent'] },
+    { category: 'Transportation', aliases: ['transportation', 'transport', 'commute'] },
+    { category: 'Entertainment', aliases: ['entertainment', 'movie', 'movies', 'fun'] },
+    { category: 'Bills', aliases: ['bills', 'utilities', 'utility', 'bill'] },
+    { category: 'Shopping', aliases: ['shopping', 'purchase', 'shop'] },
+    { category: 'Investment', aliases: ['investment', 'dividend'] },
+    { category: 'Education', aliases: ['education', 'tuition', 'course', 'school'] },
+    { category: 'Freelance', aliases: ['freelance', 'contract'] },
+    { category: 'Health', aliases: ['health', 'medical', 'doctor', 'pharmacy'] },
+    { category: 'Salary', aliases: ['salary', 'paycheck', 'wage'] },
+    { category: 'Gift', aliases: ['gift'] },
+    { category: 'Food', aliases: ['groceries', 'grocery', 'food'] },
+    { category: 'Other', aliases: ['other'] },
+  ]
+
+  const sortedCategoryAliases = categoryAliases
+    .map((entry) => ({
+      ...entry,
+      aliases: [...entry.aliases].sort((left, right) => right.length - left.length),
+    }))
+    .sort((left, right) => right.aliases[0].length - left.aliases[0].length)
+
+  for (const { category, aliases } of sortedCategoryAliases) {
+    if (aliases.some((alias) => normalizedTranscript.includes(alias))) {
+      return category
+    }
+  }
+
+  return ''
+}
+
+function resolveVoiceTransactionAmount(transcript) {
+  const normalizedTranscript = transcript.toLowerCase().trim()
+
+  const keywordMatch = normalizedTranscript.match(
+    /\b(?:amount|value|total)\b(?:\s+(?:is|to|of))?\s+\$?(\d+(?:\.\d{1,2})?)/,
+  )
+  if (keywordMatch) {
+    return keywordMatch[1]
+  }
+
+  const plainNumberMatches = [...normalizedTranscript.matchAll(/(?:^|\s)\$?(\d+(?:\.\d{1,2})?)(?:\s|$)/g)]
+  if (plainNumberMatches.length > 0) {
+    return plainNumberMatches[plainNumberMatches.length - 1][1]
+  }
+
+  return ''
+}
+
+function applyVoiceTransactionUpdate(transcript, currentForm) {
+  const normalizedTranscript = transcript.toLowerCase().trim()
+  const nextForm = { ...currentForm }
+
+  if (/\bincome\b/.test(normalizedTranscript)) {
+    nextForm.type = 'income'
+  } else if (/\bexpense\b/.test(normalizedTranscript)) {
+    nextForm.type = 'expense'
+  }
+
+  const category = resolveVoiceTransactionCategory(normalizedTranscript)
+  if (category) {
+    nextForm.category = category
+  }
+
+  const amount = resolveVoiceTransactionAmount(normalizedTranscript)
+  if (amount) {
+    nextForm.amount = amount
+  }
+
+  return nextForm
+}
+
+function getTransactionSubmissionErrorMessage(error, fallbackMessage) {
+  return error instanceof Error ? `${fallbackMessage} ${error.message}` : fallbackMessage
+}
+
 function createDemoTransactions() {
   const today = new Date().toISOString().slice(0, 10)
 
@@ -313,6 +415,8 @@ function App() {
     date: new Date().toISOString().slice(0, 10),
     note: '',
   })
+  const [transactionVoiceMessage, setTransactionVoiceMessage] = useState('')
+  const [isTransactionVoiceListening, setIsTransactionVoiceListening] = useState(false)
   const [budgetForm, setBudgetForm] = useState({
     month: getCurrentMonthKey(),
     category: 'Food',
@@ -625,6 +729,62 @@ function App() {
       note: '',
     })
     setEditingTransactionId(null)
+    setTransactionVoiceMessage('')
+    setIsTransactionVoiceListening(false)
+  }
+
+  async function persistTransaction(transactionData, transactionId = editingTransactionId) {
+    const normalizedAmount = Number.parseFloat(transactionData.amount)
+    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+      return false
+    }
+
+    const nextTransaction = {
+      id: transactionId || crypto.randomUUID(),
+      type: transactionData.type,
+      category: transactionData.category,
+      amount: normalizedAmount,
+      date: transactionData.date,
+      note: typeof transactionData.note === 'string' ? transactionData.note.trim() : '',
+    }
+
+    try {
+      const savedTransaction = isBackendConfigured
+        ? transactionId
+          ? await updateTransaction(transactionId, nextTransaction)
+          : await createTransaction(nextTransaction)
+        : nextTransaction
+
+      setTransactions((currentTransactions) => {
+        if (transactionId) {
+          return currentTransactions.map((transaction) =>
+            transaction.id === transactionId ? savedTransaction : transaction,
+          )
+        }
+
+        return [savedTransaction, ...currentTransactions]
+      })
+
+      setConnectionState(isBackendConfigured ? 'online' : 'local')
+      setSyncMessage(
+        isBackendConfigured ? 'Transaction saved to backend.' : 'Transaction saved locally.',
+      )
+      resetTransactionForm()
+      return true
+    } catch (error) {
+      setTransactions((currentTransactions) => {
+        if (transactionId) {
+          return currentTransactions.map((transaction) =>
+            transaction.id === transactionId ? nextTransaction : transaction,
+          )
+        }
+
+        return [nextTransaction, ...currentTransactions]
+      })
+      setConnectionState('local-fallback')
+      setSyncMessage(getTransactionSubmissionErrorMessage(error, 'Saved locally because the backend request failed.'))
+      return false
+    }
   }
 
   async function handleTransactionSubmit(event) {
@@ -635,58 +795,13 @@ function App() {
       return
     }
 
-    const amount = Number.parseFloat(transactionForm.amount)
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return
-    }
-
-    const nextTransaction = {
-      id: editingTransactionId || crypto.randomUUID(),
-      type: transactionForm.type,
-      category: activeTransactionCategory,
-      amount,
-      date: transactionForm.date,
-      note: transactionForm.note.trim(),
-    }
-
-    try {
-      const savedTransaction = isBackendConfigured
-        ? editingTransactionId
-          ? await updateTransaction(editingTransactionId, nextTransaction)
-          : await createTransaction(nextTransaction)
-        : nextTransaction
-
-      setTransactions((currentTransactions) => {
-        if (editingTransactionId) {
-          return currentTransactions.map((transaction) =>
-            transaction.id === editingTransactionId ? savedTransaction : transaction,
-          )
-        }
-
-        return [savedTransaction, ...currentTransactions]
-      })
-
-      setConnectionState(isBackendConfigured ? 'online' : 'local')
-      setSyncMessage(isBackendConfigured ? 'Transaction saved to backend.' : 'Transaction saved locally.')
-    } catch (error) {
-      setTransactions((currentTransactions) => {
-        if (editingTransactionId) {
-          return currentTransactions.map((transaction) =>
-            transaction.id === editingTransactionId ? nextTransaction : transaction,
-          )
-        }
-
-        return [nextTransaction, ...currentTransactions]
-      })
-      setConnectionState('local-fallback')
-      setSyncMessage(
-        error instanceof Error
-          ? `Saved locally because the backend request failed. ${error.message}`
-          : 'Saved locally because the backend request failed.',
-      )
-    }
-
-    resetTransactionForm()
+    await persistTransaction(
+      {
+        ...transactionForm,
+        category: activeTransactionCategory,
+      },
+      editingTransactionId,
+    )
   }
 
   function handleEditTransaction(transaction) {
@@ -698,6 +813,63 @@ function App() {
       date: transaction.date,
       note: transaction.note,
     })
+    setTransactionVoiceMessage('')
+  }
+
+  async function handleVoiceSaveTransaction() {
+    const SpeechRecognition = getSpeechRecognitionConstructor()
+    if (!SpeechRecognition) {
+      setTransactionVoiceMessage('Web Speech API is not supported in this browser.')
+      return
+    }
+
+    const recognition = new SpeechRecognition()
+    recognition.lang = 'en-US'
+    recognition.interimResults = false
+    recognition.maxAlternatives = 1
+
+    setTransactionVoiceMessage('Say income or expense, a category, and an amount, like: expense food 25.')
+    setIsTransactionVoiceListening(true)
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript?.trim() || ''
+      if (!transcript) {
+        setTransactionVoiceMessage('No speech was captured. Try again.')
+        return
+      }
+
+      const nextForm = applyVoiceTransactionUpdate(transcript, transactionForm)
+      const parsedAmount = Number.parseFloat(nextForm.amount)
+      if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+        setTransactionVoiceMessage('Speech must include a valid amount before saving. Try again.')
+        return
+      }
+
+      setTransactionForm(nextForm)
+      setTransactionVoiceMessage(`Saving spoken transaction: ${transcript}`)
+      void persistTransaction(nextForm, editingTransactionId).then((saved) => {
+        if (saved) {
+          setTransactionVoiceMessage('Transaction saved from speech input.')
+        }
+      })
+    }
+
+    recognition.onerror = (event) => {
+      setTransactionVoiceMessage(
+        event.error ? `Voice input failed: ${event.error}.` : 'Voice input failed. Please try again.',
+      )
+    }
+
+    recognition.onend = () => {
+      setIsTransactionVoiceListening(false)
+    }
+
+    try {
+      recognition.start()
+    } catch {
+      setIsTransactionVoiceListening(false)
+      setTransactionVoiceMessage('Voice recognition could not start. Please try again.')
+    }
   }
 
   async function handleDeleteTransaction(transactionId) {
@@ -1304,12 +1476,27 @@ function App() {
                   <button type="submit" className="primary-button">
                     {editingTransactionId ? 'Update transaction' : 'Save transaction'}
                   </button>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={handleVoiceSaveTransaction}
+                    disabled={isTransactionVoiceListening}
+                  >
+                    {isTransactionVoiceListening
+                      ? 'Listening...'
+                      : editingTransactionId
+                        ? 'Update by voice'
+                        : 'Save by voice'}
+                  </button>
                   {editingTransactionId ? (
                     <button type="button" className="ghost-button" onClick={resetTransactionForm}>
                       Cancel edit
                     </button>
                   ) : null}
                 </div>
+                {transactionVoiceMessage ? (
+                  <p className="sync-status sync-status-loading">{transactionVoiceMessage}</p>
+                ) : null}
               </form>
             </section>
 
@@ -1492,12 +1679,27 @@ function App() {
                   <button type="submit" className="primary-button">
                     {editingTransactionId ? 'Update transaction' : 'Save transaction'}
                   </button>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={handleVoiceSaveTransaction}
+                    disabled={isTransactionVoiceListening}
+                  >
+                    {isTransactionVoiceListening
+                      ? 'Listening...'
+                      : editingTransactionId
+                        ? 'Update by voice'
+                        : 'Save by voice'}
+                  </button>
                   {editingTransactionId ? (
                     <button type="button" className="ghost-button" onClick={resetTransactionForm}>
                       Cancel edit
                     </button>
                   ) : null}
                 </div>
+                {transactionVoiceMessage ? (
+                  <p className="sync-status sync-status-loading">{transactionVoiceMessage}</p>
+                ) : null}
               </form>
             </section>
 
