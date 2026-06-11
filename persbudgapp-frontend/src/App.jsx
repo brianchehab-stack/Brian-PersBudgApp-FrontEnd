@@ -4,6 +4,7 @@ import {
   createBudget,
   createTransaction,
   deleteTransaction,
+  fetchAuthenticatedUser,
   fetchBudgets,
   fetchTransactions,
   apiConfigurationWarning,
@@ -342,21 +343,47 @@ function App() {
   }, [authToken])
 
   useEffect(() => {
-    if (!authToken || authUser) {
+    if (!isBackendConfigured || !authToken) {
       return
     }
 
-    const tokenPayload = parseJwtPayload(authToken)
-    if (!tokenPayload || typeof tokenPayload !== 'object') {
+    if (authUser && getUserKey(authUser, authToken)) {
       return
     }
 
-    setAuthUser({
-      id: tokenPayload.sub || tokenPayload.userId || tokenPayload.id || '',
-      email: tokenPayload.email || '',
-      name: tokenPayload.name || tokenPayload.username || '',
-    })
-  }, [authToken, authUser])
+    let isActive = true
+
+    async function restoreAuthenticatedUser() {
+      setConnectionState('loading')
+      setSyncMessage('Restoring your session...')
+
+      try {
+        const me = await fetchAuthenticatedUser()
+        if (!isActive) {
+          return
+        }
+
+        setAuthUser(me)
+      } catch (error) {
+        if (!isActive) {
+          return
+        }
+
+        // Keep expired/invalid tokens from trapping the app in an unauthenticated-but-signed-in state.
+        setAuthToken('')
+        setAuthUser(null)
+        setAuthError(error instanceof Error ? error.message : 'Session expired. Please log in again.')
+        setConnectionState('auth-required')
+        setSyncMessage('Authentication required. Please log in.')
+      }
+    }
+
+    restoreAuthenticatedUser()
+
+    return () => {
+      isActive = false
+    }
+  }, [authToken, authUser, isBackendConfigured])
 
   useEffect(() => {
     setEntriesHydrated(false)

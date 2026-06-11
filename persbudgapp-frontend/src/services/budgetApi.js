@@ -188,6 +188,19 @@ function parseAuthPayload(payload, options = {}) {
   }
 }
 
+function parseUserPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid authenticated user response from backend.')
+  }
+
+  const user = payload.user ?? payload?.data?.user ?? payload
+  if (!user || typeof user !== 'object') {
+    throw new Error('Authenticated user details were not returned by backend.')
+  }
+
+  return user
+}
+
 export async function loginUser(credentials) {
   const payload = await requestJson('/auth/login', {
     method: 'POST',
@@ -206,8 +219,49 @@ export async function registerUser(account) {
   return parseAuthPayload(payload, { requireToken: false })
 }
 
-export function fetchTransactions() {
-  return requestJson('/transactions')
+export async function fetchAuthenticatedUser() {
+  const payload = await requestJson('/auth/me')
+  return parseUserPayload(payload)
+}
+
+function normalizeTransactionShape(transaction) {
+  if (!transaction || typeof transaction !== 'object') {
+    return transaction
+  }
+
+  return {
+    ...transaction,
+    id: transaction.id ?? transaction._id,
+    amount: Number.isFinite(Number(transaction.amount)) ? Number(transaction.amount) : 0,
+    note:
+      typeof transaction.note === 'string'
+        ? transaction.note
+        : typeof transaction.description === 'string'
+          ? transaction.description
+          : '',
+    date: typeof transaction.date === 'string' ? transaction.date.slice(0, 10) : transaction.date,
+  }
+}
+
+function toTransactionRequestPayload(transaction) {
+  return {
+    type: transaction?.type,
+    category: transaction?.category,
+    amount: transaction?.amount,
+    date: transaction?.date,
+    note: transaction?.note,
+  }
+}
+
+export async function fetchTransactions() {
+  const payload = await requestJson('/transactions')
+  const transactionItems = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : []
+
+  if (!Array.isArray(transactionItems)) {
+    return []
+  }
+
+  return transactionItems.map(normalizeTransactionShape)
 }
 
 function extractMonthKey(dateValue) {
@@ -297,15 +351,15 @@ export async function fetchBudgets() {
 export function createTransaction(transaction) {
   return requestJson('/transactions', {
     method: 'POST',
-    body: JSON.stringify(transaction),
-  })
+    body: JSON.stringify(toTransactionRequestPayload(transaction)),
+  }).then(normalizeTransactionShape)
 }
 
 export function updateTransaction(transactionId, transaction) {
   return requestJson(`/transactions/${transactionId}`, {
     method: 'PUT',
-    body: JSON.stringify(transaction),
-  })
+    body: JSON.stringify(toTransactionRequestPayload(transaction)),
+  }).then(normalizeTransactionShape)
 }
 
 export function deleteTransaction(transactionId) {
