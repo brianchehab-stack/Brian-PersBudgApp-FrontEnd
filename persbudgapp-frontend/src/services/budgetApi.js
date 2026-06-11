@@ -210,8 +210,45 @@ export function fetchTransactions() {
   return requestJson('/transactions')
 }
 
-export function fetchBudgets() {
-  return requestJson('/budgets')
+function normalizeBudgetShape(budget) {
+  if (!budget || typeof budget !== 'object') {
+    return budget
+  }
+
+  const normalizedName =
+    typeof budget.name === 'string' && budget.name.trim().length > 0
+      ? budget.name
+      : typeof budget.category === 'string'
+        ? budget.category
+        : ''
+
+  return {
+    ...budget,
+    id: budget.id ?? budget._id,
+    name: normalizedName,
+    category: normalizedName,
+  }
+}
+
+function toBudgetRequestPayload(budget) {
+  const budgetName =
+    typeof budget?.name === 'string' && budget.name.trim().length > 0
+      ? budget.name
+      : budget?.category
+
+  return {
+    ...budget,
+    name: budgetName,
+  }
+}
+
+export async function fetchBudgets() {
+  const payload = await requestJson('/budgets')
+  if (!Array.isArray(payload)) {
+    return []
+  }
+
+  return payload.map(normalizeBudgetShape)
 }
 
 export function createTransaction(transaction) {
@@ -237,13 +274,13 @@ export function deleteTransaction(transactionId) {
 export function createBudget(budget) {
   return requestJson('/budgets', {
     method: 'POST',
-    body: JSON.stringify(budget),
-  })
+    body: JSON.stringify(toBudgetRequestPayload(budget)),
+  }).then(normalizeBudgetShape)
 }
 
 export function updateBudget(budgetId, budget) {
   return requestJson(`/budgets/${budgetId}`, {
     method: 'PUT',
-    body: JSON.stringify(budget),
-  })
+    body: JSON.stringify(toBudgetRequestPayload(budget)),
+  }).then(normalizeBudgetShape)
 }
