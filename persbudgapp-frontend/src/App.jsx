@@ -1097,8 +1097,6 @@ function App() {
     setAuthError('')
     setConnectionState('auth-required')
     setSyncMessage('Authentication required. Please log in.')
-    setTransactions([])
-    setBudgets([])
     navigate('/login', { replace: true })
   }
 
