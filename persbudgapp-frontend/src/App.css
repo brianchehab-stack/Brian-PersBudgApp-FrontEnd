@@ -164,6 +164,22 @@
   flex-wrap: wrap;
 }
 
+.hero-greeting-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.hero-greeting {
+  margin: 0;
+}
+
+.hero-logout-button {
+  padding: 8px 12px;
+  border-radius: 12px;
+}
+
 .screen-nav {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

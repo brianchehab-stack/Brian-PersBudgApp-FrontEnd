@@ -1243,9 +1243,30 @@ function App() {
         </p>
       ) : null}
 
+      <nav className="screen-nav" aria-label="Budget screens">
+        {screenTabs.map((screen) => (
+          <button
+            type="button"
+            key={screen.id}
+            className={`screen-tab ${activeScreen === screen.id ? 'is-active' : ''}`}
+            onClick={() => navigate(`/app/${screen.id}`)}
+          >
+            <span>{screen.label}</span>
+            <small>{screen.description}</small>
+          </button>
+        ))}
+      </nav>
+
       <header className="hero-panel">
         <div className="hero-copy">
-          <p className="eyebrow">Welcome, {authenticatedDisplayFirstName}</p>
+          <div className="hero-greeting-row">
+            {isBackendConfigured && authToken ? (
+              <button type="button" className="ghost-button hero-logout-button" onClick={handleLogout}>
+                Log out
+              </button>
+            ) : null}
+            <p className="eyebrow hero-greeting">Welcome, {authenticatedDisplayFirstName}</p>
+          </div>
           <h1>Track your income, expenses, and savings</h1>
           <p className="hero-description">
             Add transactions, monitor category budgets, spot overspending early, and keep your financial
@@ -1256,13 +1277,6 @@ function App() {
             {syncMessage}
           </p>
 
-          {isBackendConfigured && authToken ? (
-            <div className="hero-actions">
-              <button type="button" className="ghost-button" onClick={handleLogout}>
-                Log out
-              </button>
-            </div>
-          ) : null}
         </div>
 
         <div className="hero-metrics">
@@ -1285,51 +1299,9 @@ function App() {
         </div>
       </header>
 
-      <nav className="screen-nav" aria-label="Budget screens">
-        {screenTabs.map((screen) => (
-          <button
-            type="button"
-            key={screen.id}
-            className={`screen-tab ${activeScreen === screen.id ? 'is-active' : ''}`}
-            onClick={() => navigate(`/app/${screen.id}`)}
-          >
-            <span>{screen.label}</span>
-            <small>{screen.description}</small>
-          </button>
-        ))}
-      </nav>
-
       <main className="dashboard-grid">
         {activeScreen === 'dashboard' ? (
           <>
-            <section className="card panel-form">
-              <div className="section-heading">
-                <p className="eyebrow">Budget snapshot</p>
-                <h2>{currentMonth} plan</h2>
-              </div>
-              <div className="budget-list budget-list-compact">
-                {budgetStatus.length > 0 ? (
-                  budgetStatus.slice(0, 2).map((budget) => (
-                    <article className={`budget-card ${budget.isOver ? 'is-over' : ''}`} key={budget.id}>
-                      <div className="budget-card-header">
-                        <div>
-                          <h3>{budget.category}</h3>
-                          <p>{budget.month}</p>
-                        </div>
-                        <strong>{formatCurrency(budget.remaining)} left</strong>
-                      </div>
-
-                      <div className="progress-track" aria-hidden="true">
-                        <span className="progress-fill" style={{ width: `${budget.progress}%` }} />
-                      </div>
-                    </article>
-                  ))
-                ) : (
-                  <p className="empty-state">No budgets have been created for this month yet.</p>
-                )}
-              </div>
-            </section>
-
             <section className="card panel-form">
               <div className="section-heading">
                 <p className="eyebrow">Quick add</p>
@@ -1466,6 +1438,34 @@ function App() {
                   <p className="sync-status sync-status-loading">{transactionVoiceMessage}</p>
                 ) : null}
               </form>
+            </section>
+
+            <section className="card panel-form">
+              <div className="section-heading">
+                <p className="eyebrow">Budget snapshot</p>
+                <h2>{currentMonth} plan</h2>
+              </div>
+              <div className="budget-list budget-list-compact">
+                {budgetStatus.length > 0 ? (
+                  budgetStatus.slice(0, 2).map((budget) => (
+                    <article className={`budget-card ${budget.isOver ? 'is-over' : ''}`} key={budget.id}>
+                      <div className="budget-card-header">
+                        <div>
+                          <h3>{budget.category}</h3>
+                          <p>{budget.month}</p>
+                        </div>
+                        <strong>{formatCurrency(budget.remaining)} left</strong>
+                      </div>
+
+                      <div className="progress-track" aria-hidden="true">
+                        <span className="progress-fill" style={{ width: `${budget.progress}%` }} />
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p className="empty-state">No budgets have been created for this month yet.</p>
+                )}
+              </div>
             </section>
 
             <section className="card panel-wide">
