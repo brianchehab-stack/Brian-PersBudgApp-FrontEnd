@@ -189,6 +189,20 @@ function applyVoiceTransactionUpdate(transcript, currentForm) {
   return nextForm
 }
 
+function normalizeTransactionTypeAndCategory(transactionForm) {
+  const normalizedType = transactionForm.type === 'income' ? 'income' : 'expense'
+  const allowedCategories = normalizedType === 'income' ? incomeCategories : expenseCategories
+  const normalizedCategory = allowedCategories.includes(transactionForm.category)
+    ? transactionForm.category
+    : allowedCategories[0]
+
+  return {
+    ...transactionForm,
+    type: normalizedType,
+    category: normalizedCategory,
+  }
+}
+
 function getTransactionSubmissionErrorMessage(error, fallbackMessage) {
   return error instanceof Error ? `${fallbackMessage} ${error.message}` : fallbackMessage
 }
@@ -858,7 +872,8 @@ function App() {
         return
       }
 
-      const nextForm = applyVoiceTransactionUpdate(transcript, transactionForm)
+      const spokenForm = applyVoiceTransactionUpdate(transcript, transactionForm)
+      const nextForm = normalizeTransactionTypeAndCategory(spokenForm)
       const parsedAmount = Number.parseFloat(nextForm.amount)
       if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
         setTransactionVoiceMessage('Speech must include a valid amount before saving. Try again.')
