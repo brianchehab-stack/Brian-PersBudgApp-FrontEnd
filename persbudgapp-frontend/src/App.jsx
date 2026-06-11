@@ -395,6 +395,60 @@ function saveEntriesForUser(userKey, transactions, budgets) {
   writeEntriesStorage(allEntries)
 }
 
+function buildStableItemKey(item) {
+  if (!item || typeof item !== 'object') {
+    return ''
+  }
+
+  const idCandidate = item.id ?? item._id
+  if (typeof idCandidate === 'string' || typeof idCandidate === 'number') {
+    const normalizedId = String(idCandidate).trim()
+    if (normalizedId) {
+      return `id:${normalizedId}`
+    }
+  }
+
+  const parts = [
+    item.type,
+    item.category,
+    item.amount,
+    item.date,
+    item.month,
+    item.limit,
+    item.note,
+  ]
+    .map((value) => (value == null ? '' : String(value).trim()))
+    .filter(Boolean)
+
+  return parts.length > 0 ? `shape:${parts.join('|')}` : ''
+}
+
+function mergeUniqueEntries(primaryItems, secondaryItems) {
+  const merged = []
+  const seen = new Set()
+
+  for (const candidate of [...primaryItems, ...secondaryItems]) {
+    if (!candidate || typeof candidate !== 'object') {
+      continue
+    }
+
+    const stableKey = buildStableItemKey(candidate)
+    if (!stableKey) {
+      merged.push(candidate)
+      continue
+    }
+
+    if (seen.has(stableKey)) {
+      continue
+    }
+
+    seen.add(stableKey)
+    merged.push(candidate)
+  }
+
+  return merged
+}
+
 function App() {
   const [authForm, setAuthForm] = useState({
     firstName: '',
@@ -569,12 +623,21 @@ function App() {
           return
         }
 
-        setTransactions(Array.isArray(remoteTransactions) ? remoteTransactions : [])
-        setBudgets(Array.isArray(remoteBudgets) ? remoteBudgets : [])
+        const mergedTransactions = mergeUniqueEntries(
+          Array.isArray(remoteTransactions) ? remoteTransactions : [],
+          cachedEntries.transactions,
+        )
+        const mergedBudgets = mergeUniqueEntries(
+          Array.isArray(remoteBudgets) ? remoteBudgets : [],
+          cachedEntries.budgets,
+        )
+
+        setTransactions(mergedTransactions)
+        setBudgets(mergedBudgets)
         saveEntriesForUser(
           resolvedUserKey,
-          Array.isArray(remoteTransactions) ? remoteTransactions : [],
-          Array.isArray(remoteBudgets) ? remoteBudgets : [],
+          mergedTransactions,
+          mergedBudgets,
         )
         setConnectionState('online')
         setSyncMessage('Data loaded successfully.')
@@ -1091,6 +1154,10 @@ function App() {
   }
 
   function handleLogout() {
+    if (resolvedUserKey) {
+      saveEntriesForUser(resolvedUserKey, transactions, budgets)
+    }
+
     setAuthToken('')
     setAuthUser(null)
     setAuthStatusMessage('')

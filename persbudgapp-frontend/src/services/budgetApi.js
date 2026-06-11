@@ -83,6 +83,15 @@ export const apiConfigurationWarning = resolvedApiConfig.warning
 export const isBackendConfigured = apiBaseUrl.length > 0
 let authToken = ''
 
+const transactionCategoryToApiCategory = {
+  'Housing/Rent': 'Housing',
+  'Other Income': 'Other',
+}
+
+const transactionApiCategoryToUiCategory = {
+  Housing: 'Housing/Rent',
+}
+
 export function setApiAuthToken(token) {
   authToken = typeof token === 'string' ? token : ''
 }
@@ -229,9 +238,13 @@ function normalizeTransactionShape(transaction) {
     return transaction
   }
 
+  const rawCategory = typeof transaction.category === 'string' ? transaction.category.trim() : ''
+  const normalizedCategory = transactionApiCategoryToUiCategory[rawCategory] || rawCategory
+
   return {
     ...transaction,
     id: transaction.id ?? transaction._id,
+    category: normalizedCategory,
     amount: Number.isFinite(Number(transaction.amount)) ? Number(transaction.amount) : 0,
     note:
       typeof transaction.note === 'string'
@@ -243,10 +256,23 @@ function normalizeTransactionShape(transaction) {
   }
 }
 
+function toApiTransactionCategory(category) {
+  if (typeof category !== 'string') {
+    return category
+  }
+
+  const normalizedCategory = category.trim()
+  if (!normalizedCategory) {
+    return normalizedCategory
+  }
+
+  return transactionCategoryToApiCategory[normalizedCategory] || normalizedCategory
+}
+
 function toTransactionRequestPayload(transaction) {
   return {
     type: transaction?.type,
-    category: transaction?.category,
+    category: toApiTransactionCategory(transaction?.category),
     amount: transaction?.amount,
     date: transaction?.date,
     note: transaction?.note,
