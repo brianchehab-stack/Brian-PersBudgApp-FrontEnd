@@ -297,15 +297,36 @@ function App() {
 
   const alerts = budgetStatus.filter((budget) => budget.isAtRisk)
 
-  const chartRows = useMemo(() => {
+  const pieChartSegments = useMemo(() => {
     const entries = Object.entries(expenseByCategory).sort((left, right) => right[1] - left[1])
-    const highest = entries[0]?.[1] || 1
+    const total = entries.reduce((sum, [, amount]) => sum + amount, 0)
+    const segmentColors = [
+      '#ef4444',
+      '#f97316',
+      '#eab308',
+      '#22c55e',
+      '#14b8a6',
+      '#3b82f6',
+      '#8b5cf6',
+      '#ec4899',
+      '#64748b',
+    ]
 
-    return entries.map(([category, amount]) => ({
-      category,
-      amount,
-      width: (amount / highest) * 100,
-    }))
+    let offset = 0
+
+    return entries.map(([category, amount], index) => {
+      const percentage = total > 0 ? (amount / total) * 100 : 0
+      const segment = {
+        category,
+        amount,
+        percentage,
+        color: segmentColors[index % segmentColors.length],
+        offset,
+      }
+
+      offset += percentage
+      return segment
+    })
   }, [expenseByCategory])
 
   const availableCategories = transactionForm.type === 'income' ? incomeCategories : expenseCategories
@@ -1423,19 +1444,47 @@ function App() {
                 <h2>Spending by category</h2>
               </div>
 
-              {chartRows.length > 0 ? (
-                <div className="chart-list">
-                  {chartRows.map((row) => (
-                    <div className="chart-row" key={row.category}>
-                      <div className="chart-meta">
-                        <span>{row.category}</span>
-                        <strong>{formatCurrency(row.amount)}</strong>
-                      </div>
-                      <div className="progress-track chart-track" aria-hidden="true">
-                        <span className="progress-fill chart-fill" style={{ width: `${row.width}%` }} />
-                      </div>
-                    </div>
-                  ))}
+              {pieChartSegments.length > 0 ? (
+                <div className="pie-chart-layout">
+                  <svg
+                    className="pie-chart"
+                    viewBox="0 0 42 42"
+                    role="img"
+                    aria-label="Expense distribution by category"
+                  >
+                    <circle className="pie-chart-track" cx="21" cy="21" r="15.9155" />
+                    {pieChartSegments.map((segment) => (
+                      <circle
+                        key={segment.category}
+                        className="pie-chart-segment"
+                        cx="21"
+                        cy="21"
+                        r="15.9155"
+                        fill="transparent"
+                        stroke={segment.color}
+                        strokeDasharray={`${segment.percentage} ${100 - segment.percentage}`}
+                        strokeDashoffset={25 - segment.offset}
+                      />
+                    ))}
+                  </svg>
+
+                  <div className="pie-legend" aria-label="Pie chart legend">
+                    {pieChartSegments.map((segment) => (
+                      <article className="pie-legend-row" key={segment.category}>
+                        <div className="pie-legend-meta">
+                          <span
+                            className="pie-legend-swatch"
+                            style={{ backgroundColor: segment.color }}
+                            aria-hidden="true"
+                          />
+                          <span>{segment.category}</span>
+                        </div>
+                        <strong>
+                          {formatCurrency(segment.amount)} ({segment.percentage.toFixed(1)}%)
+                        </strong>
+                      </article>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <p className="empty-state">Add an expense to see category charts.</p>

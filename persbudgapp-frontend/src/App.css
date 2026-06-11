@@ -263,7 +263,6 @@
 .field-grid,
 .filter-bar,
 .alert-list,
-.chart-list,
 .transaction-list,
 .budget-list {
   display: grid;
@@ -409,7 +408,7 @@ select:focus {
 .budget-card,
 .alert,
 .transaction-row,
-.chart-row {
+.pie-legend-row {
   border-radius: 20px;
   border: 1px solid var(--border-soft);
   background: #ffffff;
@@ -422,7 +421,7 @@ select:focus {
 }
 
 .budget-card-header,
-.chart-meta,
+.pie-legend-meta,
 .transaction-title {
   display: flex;
   align-items: center;
@@ -432,7 +431,7 @@ select:focus {
 
 .budget-card-header h3,
 .transaction-title strong,
-.chart-meta span {
+.pie-legend-meta span {
   margin: 0;
 }
 
@@ -458,12 +457,51 @@ select:focus {
   background: linear-gradient(90deg, #f97316, #dc2626);
 }
 
-.chart-track {
-  margin-top: 14px;
+.pie-chart-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
 }
 
-.chart-fill {
-  background: linear-gradient(90deg, #fb7185, #f59e0b);
+.pie-chart {
+  width: 100%;
+  max-width: 280px;
+  justify-self: center;
+  transform: rotate(-90deg);
+}
+
+.pie-chart-track {
+  fill: none;
+  stroke: rgba(148, 163, 184, 0.28);
+  stroke-width: 3.8;
+}
+
+.pie-chart-segment {
+  stroke-width: 3.8;
+}
+
+.pie-legend {
+  display: grid;
+  gap: 12px;
+}
+
+.pie-legend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.pie-legend-meta {
+  justify-content: flex-start;
+}
+
+.pie-legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .budget-values {
@@ -497,7 +535,6 @@ select:focus {
   color: var(--muted-text);
 }
 
-.chart-list,
 .transaction-list {
   gap: 14px;
 }
@@ -578,6 +615,10 @@ select:focus {
   .auth-hero,
   .auth-card {
     border-radius: 22px;
+  }
+
+  .pie-chart-layout {
+    grid-template-columns: 1fr;
   }
 
   .hero-panel {
