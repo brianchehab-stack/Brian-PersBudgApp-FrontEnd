@@ -236,6 +236,33 @@
   min-height: 118px;
 }
 
+.metric-alert-button {
+  border-radius: 22px;
+  padding: 18px;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  border: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: flex-start;
+  min-height: 118px;
+  width: 100%;
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.metric-alert-button:hover {
+  border-color: rgba(220, 38, 38, 0.4);
+  box-shadow: 0 10px 20px rgba(220, 38, 38, 0.12);
+  transform: translateY(-1px);
+}
+
+.metric-alert-button:focus-visible {
+  outline: 2px solid rgba(220, 38, 38, 0.45);
+  outline-offset: 2px;
+}
+
 .hero-metrics span {
   font-size: 0.82rem;
   text-transform: uppercase;

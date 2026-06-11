@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import {
   createBudget,
@@ -427,6 +427,7 @@ function App() {
   })
   const [transactionVoiceMessage, setTransactionVoiceMessage] = useState('')
   const [isTransactionVoiceListening, setIsTransactionVoiceListening] = useState(false)
+  const [focusAlertsRequested, setFocusAlertsRequested] = useState(false)
   const [budgetForm, setBudgetForm] = useState({
     month: getCurrentMonthKey(),
     category: 'Food',
@@ -715,8 +716,29 @@ function App() {
   const activeScreen = screenTabs.some((screen) => screen.id === routeScreenId)
     ? routeScreenId
     : 'dashboard'
+  const alertsSectionRef = useRef(null)
 
   const authenticatedDisplayFirstName = getDisplayFirstName(authUser)
+
+  useEffect(() => {
+    if (!focusAlertsRequested || activeScreen !== 'dashboard') {
+      return
+    }
+
+    const rafId = requestAnimationFrame(() => {
+      alertsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      setFocusAlertsRequested(false)
+    })
+
+    return () => cancelAnimationFrame(rafId)
+  }, [activeScreen, focusAlertsRequested])
+
+  function handleOpenAlerts() {
+    setFocusAlertsRequested(true)
+    if (activeScreen !== 'dashboard') {
+      navigate('/app/dashboard')
+    }
+  }
 
   function resetTransactionForm() {
     setTransactionForm({
@@ -1294,10 +1316,10 @@ function App() {
             <span>Savings</span>
             <strong>{formatCurrency(summary.savings)}</strong>
           </article>
-          <article>
+          <button type="button" className="metric-alert-button" onClick={handleOpenAlerts}>
             <span>Active alerts</span>
             <strong>{alerts.length}</strong>
-          </article>
+          </button>
         </div>
       </header>
 
@@ -1470,7 +1492,7 @@ function App() {
               </div>
             </section>
 
-            <section className="card panel-wide">
+            <section className="card panel-wide" id="alerts-panel" ref={alertsSectionRef}>
               <div className="section-heading">
                 <p className="eyebrow">Alerts</p>
                 <h2>Approaching or exceeding budgets</h2>
@@ -1911,10 +1933,10 @@ function App() {
                   <span>Savings</span>
                   <strong>{formatCurrency(summary.savings)}</strong>
                 </article>
-                <article>
+                <button type="button" className="metric-alert-button" onClick={handleOpenAlerts}>
                   <span>Active alerts</span>
                   <strong>{alerts.length}</strong>
-                </article>
+                </button>
               </div>
             </section>
           </>
