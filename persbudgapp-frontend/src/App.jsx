@@ -1087,8 +1087,8 @@ function App() {
       setAuthUser(authPayload.user)
       setAuthStatusMessage(
         authMode === 'login'
-          ? `Welcome, ${getDisplayName(authPayload.user)}.`
-          : `Account created successfully. Welcome, ${getDisplayName(authPayload.user)}.`,
+          ? `Welcome, ${getDisplayFirstName(authPayload.user)}.`
+          : `Account created successfully. Welcome, ${getDisplayFirstName(authPayload.user)}.`,
       )
       setAuthForm((currentForm) => ({ ...currentForm, password: '' }))
       navigate('/app/dashboard', { replace: true })
@@ -1294,7 +1294,7 @@ function App() {
 
       <header className="hero-panel">
         <div className="hero-copy">
-          <p className="eyebrow">Welcome, {authenticatedDisplayName}</p>
+          <p className="eyebrow">Welcome, {authenticatedDisplayFirstName}</p>
           <h1>Track your income, expenses, and savings</h1>
           <p className="hero-description">
             Add transactions, monitor category budgets, spot overspending early, and keep your financial
