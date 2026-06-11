@@ -819,8 +819,7 @@ function App() {
 
       <header className="hero-panel">
         <div className="hero-copy">
-          <p className="eyebrow">Personal Budget Dashboard</p>
-          {isBackendConfigured && authToken ? <p className="sync-status">Welcome, {authenticatedDisplayName}.</p> : null}
+          <p className="eyebrow">Welcome, {authenticatedDisplayName}</p>
           <h1>Track your income, expenses, and savings</h1>
           <p className="hero-description">
             Add transactions, monitor category budgets, spot overspending early, and keep your financial
