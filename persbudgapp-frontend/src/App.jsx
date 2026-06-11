@@ -795,7 +795,7 @@ function App() {
                       setAuthStatusMessage('')
                     }}
                   >
-                    Forgot password?
+                    Reset your password?
                   </button>
                 ) : null}
                 <button type="submit" className="primary-button">
