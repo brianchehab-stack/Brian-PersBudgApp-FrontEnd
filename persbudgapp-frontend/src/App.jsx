@@ -53,6 +53,31 @@ function formatDate(dateString) {
   }).format(new Date(dateString))
 }
 
+function getDisplayName(user) {
+  if (!user || typeof user !== 'object') {
+    return 'there'
+  }
+
+  const fullName = typeof user.name === 'string' ? user.name.trim() : ''
+  if (fullName) {
+    return fullName
+  }
+
+  const firstName = typeof user.firstName === 'string' ? user.firstName.trim() : ''
+  const lastName = typeof user.lastName === 'string' ? user.lastName.trim() : ''
+  const combinedName = [firstName, lastName].filter(Boolean).join(' ')
+  if (combinedName) {
+    return combinedName
+  }
+
+  const email = typeof user.email === 'string' ? user.email.trim() : ''
+  if (email) {
+    return email.split('@')[0] || email
+  }
+
+  return 'there'
+}
+
 function createDemoTransactions() {
   const today = new Date().toISOString().slice(0, 10)
 
@@ -302,6 +327,7 @@ function App() {
 
   const activeScreenInfo =
     screenTabs.find((screen) => screen.id === activeScreen) ?? screenTabs[0]
+  const authenticatedDisplayName = getDisplayName(authUser)
 
   function resetTransactionForm() {
     setTransactionForm({
@@ -552,7 +578,11 @@ function App() {
 
       setAuthToken(authPayload.token)
       setAuthUser(authPayload.user)
-      setAuthStatusMessage(authMode === 'login' ? 'Welcome back.' : 'Account created successfully.')
+      setAuthStatusMessage(
+        authMode === 'login'
+          ? `Welcome, ${getDisplayName(authPayload.user)}.`
+          : `Account created successfully. Welcome, ${getDisplayName(authPayload.user)}.`,
+      )
       setAuthForm((currentForm) => ({ ...currentForm, password: '' }))
       navigate('/app/dashboard', { replace: true })
     } catch (error) {
@@ -720,6 +750,7 @@ function App() {
       <header className="hero-panel">
         <div className="hero-copy">
           <p className="eyebrow">Personal Budget Dashboard</p>
+          {isBackendConfigured && authToken ? <p className="sync-status">Welcome, {authenticatedDisplayName}.</p> : null}
           <h1>Track your income, expenses, and savings</h1>
           <p className="hero-description">
             Add transactions, monitor category budgets, spot overspending early, and keep your financial
