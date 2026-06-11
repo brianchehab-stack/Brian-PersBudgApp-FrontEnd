@@ -121,7 +121,13 @@ function createSeedBudgets() {
 }
 
 function App() {
-  const [authForm, setAuthForm] = useState({ firstName: '', lastName: '', email: '', password: '' })
+  const [authForm, setAuthForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  })
   const [authStatusMessage, setAuthStatusMessage] = useState('')
   const [authError, setAuthError] = useState('')
   const location = useLocation()
@@ -307,8 +313,9 @@ function App() {
     ? transactionForm.category
     : availableCategories[0]
 
-  const isAuthRoute = location.pathname === '/login' || location.pathname === '/register'
-  const authMode = location.pathname === '/register' ? 'register' : 'login'
+  const isResetRoute = location.pathname === '/reset-password'
+  const isAuthRoute = location.pathname === '/login' || location.pathname === '/register' || isResetRoute
+  const authMode = location.pathname === '/register' ? 'register' : isResetRoute ? 'reset' : 'login'
 
   const screenTabs = [
     { id: 'dashboard', label: 'Dashboard', description: 'Overview and alerts' },
@@ -539,6 +546,7 @@ function App() {
 
     const email = authForm.email.trim()
     const password = authForm.password
+    const confirmPassword = authForm.confirmPassword
     const firstName = authForm.firstName.trim()
     const lastName = authForm.lastName.trim()
     const fullName = [firstName, lastName].filter(Boolean).join(' ')
@@ -553,15 +561,31 @@ function App() {
       return
     }
 
+    if (authMode !== 'login' && (!password || !confirmPassword)) {
+      setAuthError(authMode === 'reset' ? 'New password and confirmation are required.' : 'Password and confirmation are required.')
+      return
+    }
+
+    if (authMode !== 'login' && password !== confirmPassword) {
+      setAuthError('Passwords do not match.')
+      return
+    }
+
     setAuthError('')
-    setAuthStatusMessage(authMode === 'login' ? 'Signing in...' : 'Creating your account...')
+    setAuthStatusMessage(
+      authMode === 'login'
+        ? 'Signing in...'
+        : authMode === 'register'
+          ? 'Creating your account...'
+          : 'Preparing password reset...',
+    )
 
     try {
       let authPayload
 
       if (authMode === 'login') {
         authPayload = await loginUser({ email, password })
-      } else {
+      } else if (authMode === 'register') {
         const registrationPayload = await registerUser({ name: fullName, email, password })
 
         if (registrationPayload.token) {
@@ -574,6 +598,14 @@ function App() {
             user: registrationPayload.user ?? loginPayload.user,
           }
         }
+      } else {
+        setAuthStatusMessage('Password reset form is ready. Connect it to your backend reset endpoint to complete the flow.')
+        setAuthForm((currentForm) => ({
+          ...currentForm,
+          password: '',
+          confirmPassword: '',
+        }))
+        return
       }
 
       setAuthToken(authPayload.token)
@@ -647,6 +679,7 @@ function App() {
                 onClick={() => {
                   navigate('/login')
                   setAuthError('')
+                  setAuthStatusMessage('')
                 }}
               >
                 <span>Log In</span>
@@ -662,6 +695,18 @@ function App() {
               >
                 <span>Sign Up</span>
                 <small>Create a new account</small>
+              </button>
+              <button
+                type="button"
+                className={`screen-tab ${authMode === 'reset' ? 'is-active' : ''}`}
+                onClick={() => {
+                  navigate('/reset-password')
+                  setAuthError('')
+                  setAuthStatusMessage('')
+                }}
+              >
+                <span>Reset Password</span>
+                <small>Set a new password</small>
               </button>
             </div>
 
@@ -700,6 +745,12 @@ function App() {
                 </>
               ) : null}
 
+              {authMode === 'reset' ? (
+                <p className="empty-state">
+                  Enter your email and choose a new password. The new password and confirmation must match.
+                </p>
+              ) : null}
+
               <label>
                 Email
                 <input
@@ -712,24 +763,43 @@ function App() {
                 />
               </label>
 
-              <label>
-                Password
-                <input
-                  type="password"
-                  value={authForm.password}
-                  onChange={(event) =>
-                    setAuthForm((currentForm) => ({ ...currentForm, password: event.target.value }))
-                  }
-                  placeholder="Enter a strong password"
-                />
-              </label>
+              {authMode !== 'login' ? (
+                <label>
+                  {authMode === 'reset' ? 'New password' : 'Password'}
+                  <input
+                    type="password"
+                    value={authForm.password}
+                    onChange={(event) =>
+                      setAuthForm((currentForm) => ({ ...currentForm, password: event.target.value }))
+                    }
+                    placeholder={authMode === 'reset' ? 'Enter a new password' : 'Enter a strong password'}
+                  />
+                </label>
+              ) : null}
+
+              {authMode !== 'login' ? (
+                <label>
+                  {authMode === 'reset' ? 'Confirm new password' : 'Confirm password'}
+                  <input
+                    type="password"
+                    value={authForm.confirmPassword}
+                    onChange={(event) =>
+                      setAuthForm((currentForm) => ({
+                        ...currentForm,
+                        confirmPassword: event.target.value,
+                      }))
+                    }
+                    placeholder={authMode === 'reset' ? 'Repeat the new password' : 'Repeat the password'}
+                  />
+                </label>
+              ) : null}
 
               {authStatusMessage ? <p className="sync-status sync-status-loading">{authStatusMessage}</p> : null}
               {authError ? <p className="sync-status sync-status-local-fallback">{authError}</p> : null}
 
               <div className="form-actions">
                 <button type="submit" className="primary-button">
-                  {authMode === 'login' ? 'Log In' : 'Sign Up'}
+                  {authMode === 'login' ? 'Log In' : authMode === 'register' ? 'Sign Up' : 'Reset Password'}
                 </button>
               </div>
             </form>
