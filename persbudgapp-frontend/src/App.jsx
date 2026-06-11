@@ -17,6 +17,8 @@ import {
 import './App.css'
 
 const authStorageKey = 'persbudgapp-jwt-token'
+const entriesStorageKey = 'entries'
+const entriesUsersBucketKey = 'users'
 const budgetAlertThreshold = 0.8
 
 const expenseCategories = [
@@ -120,6 +122,152 @@ function createSeedBudgets() {
   ]
 }
 
+function parseJwtPayload(token) {
+  if (!token || typeof token !== 'string') {
+    return null
+  }
+
+  const segments = token.split('.')
+  if (segments.length < 2) {
+    return null
+  }
+
+  try {
+    const base64 = segments[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=')
+    const decoded = atob(padded)
+    return JSON.parse(decoded)
+  } catch {
+    return null
+  }
+}
+
+function normalizeUserKey(candidate) {
+  if (typeof candidate !== 'string' && typeof candidate !== 'number') {
+    return ''
+  }
+
+  const normalized = String(candidate).trim().toLowerCase()
+  if (!normalized) {
+    return ''
+  }
+
+  // Guard against unresolved identity placeholders from async auth flows.
+  if (normalized === 'null' || normalized === 'undefined' || normalized === '[object object]') {
+    return ''
+  }
+
+  return normalized
+}
+
+function getUserKey(user, token) {
+  if (user && typeof user === 'object') {
+    const idCandidate = user.id || user._id || user.userId || user.username || user.email
+    const normalizedUserCandidate = normalizeUserKey(idCandidate)
+    if (normalizedUserCandidate) {
+      return normalizedUserCandidate
+    }
+  }
+
+  const tokenPayload = parseJwtPayload(token)
+  const tokenCandidate = tokenPayload?.sub || tokenPayload?.userId || tokenPayload?.id || tokenPayload?.email
+  const normalizedTokenCandidate = normalizeUserKey(tokenCandidate)
+  if (normalizedTokenCandidate) {
+    return normalizedTokenCandidate
+  }
+
+  return ''
+}
+
+function readEntriesStorage() {
+  if (typeof window === 'undefined') {
+    return {}
+  }
+
+  try {
+    const raw = window.localStorage.getItem(entriesStorageKey)
+    if (!raw) {
+      return {}
+    }
+
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') {
+      return { [entriesUsersBucketKey]: {} }
+    }
+
+    // Current schema: { users: { [userKey]: { transactions, budgets, updatedAt } } }
+    if (
+      entriesUsersBucketKey in parsed &&
+      parsed[entriesUsersBucketKey] &&
+      typeof parsed[entriesUsersBucketKey] === 'object'
+    ) {
+      return parsed
+    }
+
+    // Legacy schema (single account payload): { transactions, budgets, ... }
+    if (Array.isArray(parsed.transactions) || Array.isArray(parsed.budgets)) {
+      return {
+        [entriesUsersBucketKey]: {
+          guest: {
+            transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
+            budgets: Array.isArray(parsed.budgets) ? parsed.budgets : [],
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      }
+    }
+
+    // Legacy schema (user keys at root): { [userKey]: { transactions, budgets, ... } }
+    return {
+      [entriesUsersBucketKey]: parsed,
+    }
+  } catch {
+    return { [entriesUsersBucketKey]: {} }
+  }
+}
+
+function writeEntriesStorage(payload) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.localStorage.setItem(entriesStorageKey, JSON.stringify(payload))
+}
+
+function loadEntriesForUser(userKey) {
+  const normalizedUserKey = normalizeUserKey(userKey)
+  if (!normalizedUserKey) {
+    return { transactions: [], budgets: [] }
+  }
+
+  const allEntries = readEntriesStorage()
+  const userEntries = allEntries[entriesUsersBucketKey]?.[normalizedUserKey]
+
+  return {
+    transactions: Array.isArray(userEntries?.transactions) ? userEntries.transactions : [],
+    budgets: Array.isArray(userEntries?.budgets) ? userEntries.budgets : [],
+  }
+}
+
+function saveEntriesForUser(userKey, transactions, budgets) {
+  const normalizedUserKey = normalizeUserKey(userKey)
+  if (!normalizedUserKey) {
+    return
+  }
+
+  const allEntries = readEntriesStorage()
+  if (!allEntries[entriesUsersBucketKey] || typeof allEntries[entriesUsersBucketKey] !== 'object') {
+    allEntries[entriesUsersBucketKey] = {}
+  }
+
+  allEntries[entriesUsersBucketKey][normalizedUserKey] = {
+    transactions,
+    budgets,
+    updatedAt: new Date().toISOString(),
+  }
+  writeEntriesStorage(allEntries)
+}
+
 function App() {
   const [authForm, setAuthForm] = useState({
     firstName: '',
@@ -140,6 +288,7 @@ function App() {
     return window.localStorage.getItem(authStorageKey) ?? ''
   })
   const [authUser, setAuthUser] = useState(null)
+  const [entriesHydrated, setEntriesHydrated] = useState(false)
 
   const [transactions, setTransactions] = useState(() =>
     isBackendConfigured ? [] : createDemoTransactions(),
@@ -170,6 +319,13 @@ function App() {
   })
   const [filters, setFilters] = useState({ category: 'All', startDate: '', endDate: '' })
   const startupWarning = apiConfigurationWarning
+  const resolvedUserKey = useMemo(() => {
+    if (!isBackendConfigured) {
+      return 'guest'
+    }
+
+    return getUserKey(authUser, authToken)
+  }, [authToken, authUser])
 
   useEffect(() => {
     setApiAuthToken(authToken)
@@ -186,7 +342,48 @@ function App() {
   }, [authToken])
 
   useEffect(() => {
+    if (!authToken || authUser) {
+      return
+    }
+
+    const tokenPayload = parseJwtPayload(authToken)
+    if (!tokenPayload || typeof tokenPayload !== 'object') {
+      return
+    }
+
+    setAuthUser({
+      id: tokenPayload.sub || tokenPayload.userId || tokenPayload.id || '',
+      email: tokenPayload.email || '',
+      name: tokenPayload.name || tokenPayload.username || '',
+    })
+  }, [authToken, authUser])
+
+  useEffect(() => {
+    setEntriesHydrated(false)
+  }, [resolvedUserKey])
+
+  useEffect(() => {
+    if (!resolvedUserKey) {
+      if (isBackendConfigured && authToken) {
+        setConnectionState('loading')
+        setSyncMessage('Resolving authenticated user...')
+      }
+      return
+    }
+
     if (!isBackendConfigured) {
+      const localEntries = loadEntriesForUser(resolvedUserKey)
+      if (localEntries.transactions.length > 0 || localEntries.budgets.length > 0) {
+        setTransactions(localEntries.transactions)
+        setBudgets(localEntries.budgets)
+      } else {
+        setTransactions(createDemoTransactions())
+        setBudgets(createSeedBudgets())
+      }
+
+      setConnectionState('local')
+      setSyncMessage('Using local data storage.')
+      setEntriesHydrated(true)
       return
     }
 
@@ -197,6 +394,15 @@ function App() {
     let isActive = true
 
     async function syncFromBackend() {
+      setConnectionState('loading')
+      setSyncMessage('Loading your data...')
+
+      const cachedEntries = loadEntriesForUser(resolvedUserKey)
+      if (cachedEntries.transactions.length > 0 || cachedEntries.budgets.length > 0) {
+        setTransactions(cachedEntries.transactions)
+        setBudgets(cachedEntries.budgets)
+      }
+
       try {
         const [remoteTransactions, remoteBudgets] = await Promise.all([
           fetchTransactions(),
@@ -209,6 +415,11 @@ function App() {
 
         setTransactions(Array.isArray(remoteTransactions) ? remoteTransactions : [])
         setBudgets(Array.isArray(remoteBudgets) ? remoteBudgets : [])
+        saveEntriesForUser(
+          resolvedUserKey,
+          Array.isArray(remoteTransactions) ? remoteTransactions : [],
+          Array.isArray(remoteBudgets) ? remoteBudgets : [],
+        )
         setConnectionState('online')
         setSyncMessage('Connected to backend.')
       } catch (error) {
@@ -216,14 +427,27 @@ function App() {
           return
         }
 
+        const fallbackEntries = loadEntriesForUser(resolvedUserKey)
         setConnectionState('local-fallback')
         setSyncMessage(
           error instanceof Error
             ? `Backend unavailable. Using local demo data. ${error.message}`
             : 'Backend unavailable. Using local demo data.',
         )
-        setTransactions(createDemoTransactions())
-        setBudgets(createSeedBudgets())
+        setTransactions(
+          fallbackEntries.transactions.length > 0
+            ? fallbackEntries.transactions
+            : createDemoTransactions(),
+        )
+        setBudgets(
+          fallbackEntries.budgets.length > 0
+            ? fallbackEntries.budgets
+            : createSeedBudgets(),
+        )
+      }
+
+      if (isActive) {
+        setEntriesHydrated(true)
       }
     }
 
@@ -232,7 +456,15 @@ function App() {
     return () => {
       isActive = false
     }
-  }, [authToken])
+  }, [authToken, resolvedUserKey])
+
+  useEffect(() => {
+    if (!entriesHydrated || !resolvedUserKey) {
+      return
+    }
+
+    saveEntriesForUser(resolvedUserKey, transactions, budgets)
+  }, [entriesHydrated, resolvedUserKey, transactions, budgets])
 
   const orderedTransactions = useMemo(
     () => [...transactions].sort((left, right) => new Date(right.date) - new Date(left.date)),
@@ -371,6 +603,11 @@ function App() {
   async function handleTransactionSubmit(event) {
     event.preventDefault()
 
+    if (isBackendConfigured && !resolvedUserKey) {
+      setSyncMessage('Cannot save yet. Waiting for user identity to resolve.')
+      return
+    }
+
     const amount = Number.parseFloat(transactionForm.amount)
     if (!Number.isFinite(amount) || amount <= 0) {
       return
@@ -467,6 +704,11 @@ function App() {
   async function handleBudgetSubmit(event) {
     event.preventDefault()
 
+    if (isBackendConfigured && !resolvedUserKey) {
+      setSyncMessage('Cannot save yet. Waiting for user identity to resolve.')
+      return
+    }
+
     const limit = Number.parseFloat(budgetForm.limit)
     if (!Number.isFinite(limit) || limit <= 0) {
       return
@@ -526,6 +768,11 @@ function App() {
   }
 
   async function clearStoredData() {
+    if (!resolvedUserKey) {
+      setSyncMessage('Cannot clear data yet. Waiting for user identity to resolve.')
+      return
+    }
+
     if (isBackendConfigured) {
       setSyncMessage('Reloading data from backend...')
 
@@ -537,6 +784,11 @@ function App() {
 
         setTransactions(Array.isArray(remoteTransactions) ? remoteTransactions : [])
         setBudgets(Array.isArray(remoteBudgets) ? remoteBudgets : [])
+        saveEntriesForUser(
+          resolvedUserKey,
+          Array.isArray(remoteTransactions) ? remoteTransactions : [],
+          Array.isArray(remoteBudgets) ? remoteBudgets : [],
+        )
         setConnectionState('online')
         setSyncMessage('Data reloaded from backend.')
       } catch (error) {
@@ -551,8 +803,11 @@ function App() {
       return
     }
 
-    setTransactions(createDemoTransactions())
-    setBudgets(createSeedBudgets())
+    const demoTransactions = createDemoTransactions()
+    const demoBudgets = createSeedBudgets()
+    setTransactions(demoTransactions)
+    setBudgets(demoBudgets)
+    saveEntriesForUser(resolvedUserKey, demoTransactions, demoBudgets)
     resetTransactionForm()
     setFilters({ category: 'All', startDate: '', endDate: '' })
   }
