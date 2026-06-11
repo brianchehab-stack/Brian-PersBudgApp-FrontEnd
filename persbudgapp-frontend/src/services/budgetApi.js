@@ -210,6 +210,19 @@ export function fetchTransactions() {
   return requestJson('/transactions')
 }
 
+function extractMonthKey(dateValue) {
+  if (typeof dateValue !== 'string' || dateValue.trim().length === 0) {
+    return ''
+  }
+
+  const normalizedDate = new Date(dateValue)
+  if (Number.isNaN(normalizedDate.getTime())) {
+    return ''
+  }
+
+  return normalizedDate.toISOString().slice(0, 7)
+}
+
 function normalizeBudgetShape(budget) {
   if (!budget || typeof budget !== 'object') {
     return budget
@@ -222,11 +235,24 @@ function normalizeBudgetShape(budget) {
         ? budget.category
         : ''
 
+  const month =
+    typeof budget.month === 'string' && budget.month.trim().length > 0
+      ? budget.month
+      : extractMonthKey(budget.startDate) || new Date().toISOString().slice(0, 7)
+  const amount = Number.isFinite(Number(budget.amount))
+    ? Number(budget.amount)
+    : Number.isFinite(Number(budget.limit))
+      ? Number(budget.limit)
+      : 0
+
   return {
     ...budget,
     id: budget.id ?? budget._id,
     name: normalizedName,
     category: normalizedName,
+    month,
+    amount,
+    limit: amount,
   }
 }
 
@@ -236,19 +262,36 @@ function toBudgetRequestPayload(budget) {
       ? budget.name
       : budget?.category
 
+  const amount = Number.isFinite(Number(budget?.amount))
+    ? Number(budget.amount)
+    : Number.isFinite(Number(budget?.limit))
+      ? Number(budget.limit)
+      : 0
+  const month =
+    typeof budget?.month === 'string' && budget.month.trim().length > 0
+      ? budget.month
+      : ''
+
   return {
-    ...budget,
     name: budgetName,
+    category: budget?.category,
+    amount,
+    period: budget?.period,
+    startDate: month ? `${month}-01` : budget?.startDate,
+    endDate: budget?.endDate,
+    notes: budget?.notes,
   }
 }
 
 export async function fetchBudgets() {
   const payload = await requestJson('/budgets')
-  if (!Array.isArray(payload)) {
+  const budgetItems = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : []
+
+  if (!Array.isArray(budgetItems)) {
     return []
   }
 
-  return payload.map(normalizeBudgetShape)
+  return budgetItems.map(normalizeBudgetShape)
 }
 
 export function createTransaction(transaction) {
