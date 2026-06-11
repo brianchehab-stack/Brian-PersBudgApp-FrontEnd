@@ -56,21 +56,19 @@ function formatDate(dateString) {
   }).format(new Date(dateString))
 }
 
-function getDisplayName(user) {
+function getDisplayFirstName(user) {
   if (!user || typeof user !== 'object') {
     return 'there'
   }
 
-  const fullName = typeof user.name === 'string' ? user.name.trim() : ''
-  if (fullName) {
-    return fullName
+  const firstName = typeof user.firstName === 'string' ? user.firstName.trim() : ''
+  if (firstName) {
+    return firstName
   }
 
-  const firstName = typeof user.firstName === 'string' ? user.firstName.trim() : ''
-  const lastName = typeof user.lastName === 'string' ? user.lastName.trim() : ''
-  const combinedName = [firstName, lastName].filter(Boolean).join(' ')
-  if (combinedName) {
-    return combinedName
+  const fullName = typeof user.name === 'string' ? user.name.trim() : ''
+  if (fullName) {
+    return fullName.split(/\s+/)[0] || fullName
   }
 
   const email = typeof user.email === 'string' ? user.email.trim() : ''
@@ -552,7 +550,7 @@ function App() {
           Array.isArray(remoteBudgets) ? remoteBudgets : [],
         )
         setConnectionState('online')
-        setSyncMessage('Connected to backend.')
+        setSyncMessage('Data loaded successfully.')
       } catch (error) {
         if (!isActive) {
           return
@@ -716,9 +714,7 @@ function App() {
     ? routeScreenId
     : 'dashboard'
 
-  const activeScreenInfo =
-    screenTabs.find((screen) => screen.id === activeScreen) ?? screenTabs[0]
-  const authenticatedDisplayName = getDisplayName(authUser)
+  const authenticatedDisplayFirstName = getDisplayFirstName(authUser)
 
   function resetTransactionForm() {
     setTransactionForm({
@@ -964,51 +960,6 @@ function App() {
     }
 
     setBudgetForm({ month: currentMonth, category: 'Food', limit: '' })
-  }
-
-  async function clearStoredData() {
-    if (!resolvedUserKey) {
-      setSyncMessage('Cannot clear data yet. Waiting for user identity to resolve.')
-      return
-    }
-
-    if (isBackendConfigured) {
-      setSyncMessage('Reloading data from backend...')
-
-      try {
-        const [remoteTransactions, remoteBudgets] = await Promise.all([
-          fetchTransactions(),
-          fetchBudgets(),
-        ])
-
-        setTransactions(Array.isArray(remoteTransactions) ? remoteTransactions : [])
-        setBudgets(Array.isArray(remoteBudgets) ? remoteBudgets : [])
-        saveEntriesForUser(
-          resolvedUserKey,
-          Array.isArray(remoteTransactions) ? remoteTransactions : [],
-          Array.isArray(remoteBudgets) ? remoteBudgets : [],
-        )
-        setConnectionState('online')
-        setSyncMessage('Data reloaded from backend.')
-      } catch (error) {
-        setConnectionState('local-fallback')
-        setSyncMessage(
-          error instanceof Error
-            ? `Could not reload backend data. ${error.message}`
-            : 'Could not reload backend data.',
-        )
-      }
-
-      return
-    }
-
-    const demoTransactions = createDemoTransactions()
-    const demoBudgets = createSeedBudgets()
-    setTransactions(demoTransactions)
-    setBudgets(demoBudgets)
-    saveEntriesForUser(resolvedUserKey, demoTransactions, demoBudgets)
-    resetTransactionForm()
-    setFilters({ category: 'All', startDate: '', endDate: '' })
   }
 
   async function handleAuthSubmit(event) {
@@ -1305,16 +1256,13 @@ function App() {
             {syncMessage}
           </p>
 
-          <div className="hero-actions">
-            <button type="button" className="secondary-button" onClick={clearStoredData}>
-              {isBackendConfigured ? 'Reload backend data' : 'Reset demo data'}
-            </button>
-            {isBackendConfigured && authToken ? (
+          {isBackendConfigured && authToken ? (
+            <div className="hero-actions">
               <button type="button" className="ghost-button" onClick={handleLogout}>
                 Log out
               </button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="hero-metrics">
@@ -1354,11 +1302,31 @@ function App() {
       <main className="dashboard-grid">
         {activeScreen === 'dashboard' ? (
           <>
-            <section className="card panel-wide screen-banner">
-              <div>
-                <p className="eyebrow">Current view</p>
-                <h2>{activeScreenInfo.label}</h2>
-                <p className="hero-description">{activeScreenInfo.description}</p>
+            <section className="card panel-form">
+              <div className="section-heading">
+                <p className="eyebrow">Budget snapshot</p>
+                <h2>{currentMonth} plan</h2>
+              </div>
+              <div className="budget-list budget-list-compact">
+                {budgetStatus.length > 0 ? (
+                  budgetStatus.slice(0, 2).map((budget) => (
+                    <article className={`budget-card ${budget.isOver ? 'is-over' : ''}`} key={budget.id}>
+                      <div className="budget-card-header">
+                        <div>
+                          <h3>{budget.category}</h3>
+                          <p>{budget.month}</p>
+                        </div>
+                        <strong>{formatCurrency(budget.remaining)} left</strong>
+                      </div>
+
+                      <div className="progress-track" aria-hidden="true">
+                        <span className="progress-fill" style={{ width: `${budget.progress}%` }} />
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p className="empty-state">No budgets have been created for this month yet.</p>
+                )}
               </div>
             </section>
 
@@ -1500,34 +1468,6 @@ function App() {
               </form>
             </section>
 
-            <section className="card panel-form">
-              <div className="section-heading">
-                <p className="eyebrow">Budget snapshot</p>
-                <h2>{currentMonth} plan</h2>
-              </div>
-              <div className="budget-list budget-list-compact">
-                {budgetStatus.length > 0 ? (
-                  budgetStatus.slice(0, 2).map((budget) => (
-                    <article className={`budget-card ${budget.isOver ? 'is-over' : ''}`} key={budget.id}>
-                      <div className="budget-card-header">
-                        <div>
-                          <h3>{budget.category}</h3>
-                          <p>{budget.month}</p>
-                        </div>
-                        <strong>{formatCurrency(budget.remaining)} left</strong>
-                      </div>
-
-                      <div className="progress-track" aria-hidden="true">
-                        <span className="progress-fill" style={{ width: `${budget.progress}%` }} />
-                      </div>
-                    </article>
-                  ))
-                ) : (
-                  <p className="empty-state">No budgets have been created for this month yet.</p>
-                )}
-              </div>
-            </section>
-
             <section className="card panel-wide">
               <div className="section-heading">
                 <p className="eyebrow">Alerts</p>
@@ -1556,14 +1496,6 @@ function App() {
 
         {activeScreen === 'transactions' ? (
           <>
-            <section className="card panel-wide screen-banner">
-              <div>
-                <p className="eyebrow">Current view</p>
-                <h2>{activeScreenInfo.label}</h2>
-                <p className="hero-description">{activeScreenInfo.description}</p>
-              </div>
-            </section>
-
             <section className="card panel-form">
               <div className="section-heading">
                 <p className="eyebrow">Transactions</p>
@@ -1801,14 +1733,6 @@ function App() {
 
         {activeScreen === 'budgets' ? (
           <>
-            <section className="card panel-wide screen-banner">
-              <div>
-                <p className="eyebrow">Current view</p>
-                <h2>{activeScreenInfo.label}</h2>
-                <p className="hero-description">{activeScreenInfo.description}</p>
-              </div>
-            </section>
-
             <section className="card panel-form">
               <div className="section-heading">
                 <p className="eyebrow">Budgets</p>
@@ -1914,14 +1838,6 @@ function App() {
 
         {activeScreen === 'insights' ? (
           <>
-            <section className="card panel-wide screen-banner">
-              <div>
-                <p className="eyebrow">Current view</p>
-                <h2>{activeScreenInfo.label}</h2>
-                <p className="hero-description">{activeScreenInfo.description}</p>
-              </div>
-            </section>
-
             <section className="card panel-wide">
               <div className="section-heading">
                 <p className="eyebrow">Insights</p>
@@ -2004,14 +1920,6 @@ function App() {
 
         {activeScreen === 'settings' ? (
           <>
-            <section className="card panel-wide screen-banner">
-              <div>
-                <p className="eyebrow">Current view</p>
-                <h2>{activeScreenInfo.label}</h2>
-                <p className="hero-description">{activeScreenInfo.description}</p>
-              </div>
-            </section>
-
             <section className="card panel-form">
               <div className="section-heading">
                 <p className="eyebrow">Connection</p>
@@ -2031,15 +1939,9 @@ function App() {
             <section className="card panel-form">
               <div className="section-heading">
                 <p className="eyebrow">Actions</p>
-                <h2>Friendly reset and refresh</h2>
+                <h2>Account actions</h2>
               </div>
-              <p className="empty-state">
-                Use the button below to reload backend data or restore the local sample set.
-              </p>
               <div className="form-actions">
-                <button type="button" className="secondary-button" onClick={clearStoredData}>
-                  {isBackendConfigured ? 'Reload backend data' : 'Reset demo data'}
-                </button>
                 {isBackendConfigured ? (
                   <button type="button" className="ghost-button" onClick={handleLogout}>
                     Log out
