@@ -176,6 +176,7 @@
 }
 
 .hero-logout-button {
+  margin-left: auto;
   padding: 8px 12px;
   border-radius: 12px;
 }
@@ -269,6 +270,14 @@
 
 .panel-form {
   grid-column: span 6;
+}
+
+.quick-add-panel {
+  grid-column: 1 / span 6;
+}
+
+.budget-snapshot-panel {
+  grid-column: 7 / span 6;
 }
 
 .panel-wide {
@@ -650,7 +659,9 @@ select:focus {
   }
 
   .panel-form,
-  .panel-wide {
+  .panel-wide,
+  .quick-add-panel,
+  .budget-snapshot-panel {
     grid-column: 1 / -1;
   }
 

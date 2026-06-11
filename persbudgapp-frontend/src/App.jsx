@@ -36,6 +36,18 @@ const expenseCategories = [
 
 const incomeCategories = ['Salary', 'Freelance', 'Gift', 'Investment', 'Other Income']
 
+const expenseCategoryColors = {
+  Food: '#ef4444',
+  'Housing/Rent': '#f97316',
+  Transportation: '#f59e0b',
+  Entertainment: '#eab308',
+  Bills: '#22c55e',
+  Shopping: '#14b8a6',
+  Health: '#06b6d4',
+  Education: '#3b82f6',
+  Other: '#64748b',
+}
+
 function getCurrentMonthKey(date = new Date()) {
   return date.toISOString().slice(0, 7)
 }
@@ -661,17 +673,7 @@ function App() {
   const pieChartSegments = useMemo(() => {
     const entries = Object.entries(expenseByCategory).sort((left, right) => right[1] - left[1])
     const total = entries.reduce((sum, [, amount]) => sum + amount, 0)
-    const segmentColors = [
-      '#ef4444',
-      '#f97316',
-      '#eab308',
-      '#22c55e',
-      '#14b8a6',
-      '#3b82f6',
-      '#8b5cf6',
-      '#ec4899',
-      '#64748b',
-    ]
+    const fallbackColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#64748b']
 
     let offset = 0
 
@@ -681,7 +683,7 @@ function App() {
         category,
         amount,
         percentage,
-        color: segmentColors[index % segmentColors.length],
+        color: expenseCategoryColors[category] || fallbackColors[index % fallbackColors.length],
         offset,
       }
 
@@ -1093,7 +1095,7 @@ function App() {
             <p className="eyebrow">Welcome to our Personal Budget App</p>
             <h1>Plan your money with a secure personal account.</h1>
             <p className="hero-description">
-              Sign up or log in to continue. 
+              Log-in or sign-up to continue. 
             </p>
           </div>
 
@@ -1260,12 +1262,12 @@ function App() {
       <header className="hero-panel">
         <div className="hero-copy">
           <div className="hero-greeting-row">
+            <p className="eyebrow hero-greeting">Welcome, {authenticatedDisplayFirstName}</p>
             {isBackendConfigured && authToken ? (
               <button type="button" className="ghost-button hero-logout-button" onClick={handleLogout}>
                 Log out
               </button>
             ) : null}
-            <p className="eyebrow hero-greeting">Welcome, {authenticatedDisplayFirstName}</p>
           </div>
           <h1>Track your income, expenses, and savings</h1>
           <p className="hero-description">
@@ -1302,7 +1304,7 @@ function App() {
       <main className="dashboard-grid">
         {activeScreen === 'dashboard' ? (
           <>
-            <section className="card panel-form">
+            <section className="card panel-form quick-add-panel">
               <div className="section-heading">
                 <p className="eyebrow">Quick add</p>
                 <h2>Record a transaction</h2>
@@ -1440,7 +1442,7 @@ function App() {
               </form>
             </section>
 
-            <section className="card panel-form">
+            <section className="card panel-form budget-snapshot-panel">
               <div className="section-heading">
                 <p className="eyebrow">Budget snapshot</p>
                 <h2>{currentMonth} plan</h2>
