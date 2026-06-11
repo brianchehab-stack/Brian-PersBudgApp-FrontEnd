@@ -664,10 +664,10 @@ function App() {
 
         <section className="auth-panel">
           <div className="auth-hero">
-            <p className="eyebrow">Welcome to PersBudgApp</p>
+            <p className="eyebrow">Welcome to our Personal Budget App</p>
             <h1>Plan your money with a secure personal account.</h1>
             <p className="hero-description">
-              Sign up or log in to continue. Your dashboard data will sync through your backend using JWT authentication.
+              Sign up or log in to continue. 
             </p>
           </div>
 
@@ -691,22 +691,11 @@ function App() {
                 onClick={() => {
                   navigate('/register')
                   setAuthError('')
+                  setAuthStatusMessage('')
                 }}
               >
                 <span>Sign Up</span>
                 <small>Create a new account</small>
-              </button>
-              <button
-                type="button"
-                className={`screen-tab ${authMode === 'reset' ? 'is-active' : ''}`}
-                onClick={() => {
-                  navigate('/reset-password')
-                  setAuthError('')
-                  setAuthStatusMessage('')
-                }}
-              >
-                <span>Reset Password</span>
-                <small>Set a new password</small>
               </button>
             </div>
 
@@ -763,19 +752,17 @@ function App() {
                 />
               </label>
 
-              {authMode !== 'login' ? (
-                <label>
-                  {authMode === 'reset' ? 'New password' : 'Password'}
-                  <input
-                    type="password"
-                    value={authForm.password}
-                    onChange={(event) =>
-                      setAuthForm((currentForm) => ({ ...currentForm, password: event.target.value }))
-                    }
-                    placeholder={authMode === 'reset' ? 'Enter a new password' : 'Enter a strong password'}
-                  />
-                </label>
-              ) : null}
+              <label>
+                {authMode === 'reset' ? 'New password' : 'Password'}
+                <input
+                  type="password"
+                  value={authForm.password}
+                  onChange={(event) =>
+                    setAuthForm((currentForm) => ({ ...currentForm, password: event.target.value }))
+                  }
+                  placeholder={authMode === 'reset' ? 'Enter a new password' : 'Enter your password'}
+                />
+              </label>
 
               {authMode !== 'login' ? (
                 <label>
@@ -798,6 +785,19 @@ function App() {
               {authError ? <p className="sync-status sync-status-local-fallback">{authError}</p> : null}
 
               <div className="form-actions">
+                {authMode === 'login' ? (
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => {
+                      navigate('/reset-password')
+                      setAuthError('')
+                      setAuthStatusMessage('')
+                    }}
+                  >
+                    Forgot password?
+                  </button>
+                ) : null}
                 <button type="submit" className="primary-button">
                   {authMode === 'login' ? 'Log In' : authMode === 'register' ? 'Sign Up' : 'Reset Password'}
                 </button>
